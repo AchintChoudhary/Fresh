@@ -1,9 +1,9 @@
 import React, { useRef, useState } from 'react'
+import BottomSheet from '../components/BottomSheet'
 import { Link } from 'react-router-dom'
 import CaptainDetails from '../components/CaptainDetails'
 import RidePopUp from '../components/RidePopUp'
-import { useGSAP } from '@gsap/react'
-import gsap from 'gsap'
+
 import ConfirmRidePopUp from '../components/ConfirmRidePopUp'
 import { useEffect, useContext } from 'react'
 import { SocketContext } from '../context/SocketContext'
@@ -22,38 +22,85 @@ const CaptainHome = () => {
     const { socket } = useContext(SocketContext)
     const { captain } = useContext(CaptainDataContext)
 
-    useEffect(() => {
-        socket.emit('join', {
-            userId: captain._id,
-            userType: 'captain'
-        })
-        const updateLocation = () => {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(position => {
+   useEffect(() => {
 
-                    socket.emit('update-location-captain', {
-                        userId: captain._id,
-                        location: {
-                            ltd: position.coords.latitude,
-                            lng: position.coords.longitude
-                        }
-                    })
+    if (!socket || !captain?._id) {
+        return
+    }
+
+    socket.emit('join', {
+        userId: captain._id,
+        userType: 'captain'
+    })
+
+    if (!navigator.geolocation) {
+        console.error('Geolocation is not supported')
+        return
+    }
+
+    const updateLocation = () => {
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+
+                socket.emit('update-location-captain', {
+                    userId: captain._id,
+                    location: {
+                        ltd: position.coords.latitude,
+                        lng: position.coords.longitude
+                    }
                 })
+
+            },
+            (error) => {
+                console.error(
+                    'Captain location error:',
+                    error.message
+                )
+            },
+            {
+                enableHighAccuracy: true,
+                maximumAge: 5000,
+                timeout: 10000
             }
-        }
+        )
+    }
 
-        const locationInterval = setInterval(updateLocation, 10000)
-        updateLocation()
+    updateLocation()
 
-        // return () => clearInterval(locationInterval)
-    }, [])
+    // Then every 10 seconds
+    const locationInterval =
+        setInterval(updateLocation, 10000)
 
-    socket.on('new-ride', (data) => {
+    return () => {
+        clearInterval(locationInterval)
+    }
 
+}, [socket, captain?._id])
+
+useEffect(() => {
+
+    if (!socket || !captain?._id) {
+        return
+    }
+
+    socket.emit('join', {
+        userId: captain._id,
+        userType: 'captain'
+    })
+
+    const handleNewRide = (data) => {
         setRide(data)
         setRidePopupPanel(true)
+    }
 
-    })
+    socket.on('new-ride', handleNewRide)
+
+    return () => {
+        socket.off('new-ride', handleNewRide)
+    }
+
+}, [socket, captain?._id])
 
     async function confirmRide() {
 
@@ -75,29 +122,6 @@ const CaptainHome = () => {
     }
 
 
-    useGSAP(function () {
-        if (ridePopupPanel) {
-            gsap.to(ridePopupPanelRef.current, {
-                transform: 'translateY(0)'
-            })
-        } else {
-            gsap.to(ridePopupPanelRef.current, {
-                transform: 'translateY(100%)'
-            })
-        }
-    }, [ ridePopupPanel ])
-
-    useGSAP(function () {
-        if (confirmRidePopupPanel) {
-            gsap.to(confirmRidePopupPanelRef.current, {
-                transform: 'translateY(0)'
-            })
-        } else {
-            gsap.to(confirmRidePopupPanelRef.current, {
-                transform: 'translateY(100%)'
-            })
-        }
-    }, [ confirmRidePopupPanel ])
 
     return (
         <div className='h-screen'>
@@ -114,19 +138,28 @@ const CaptainHome = () => {
             <div className='h-2/5 p-6'>
                 <CaptainDetails />
             </div>
-            <div ref={ridePopupPanelRef} className='fixed w-full z-10 bottom-0 translate-y-full bg-white px-3 py-10 pt-12'>
-                <RidePopUp
-                    ride={ride}
-                    setRidePopupPanel={setRidePopupPanel}
-                    setConfirmRidePopupPanel={setConfirmRidePopupPanel}
-                    confirmRide={confirmRide}
-                />
-            </div>
-            <div ref={confirmRidePopupPanelRef} className='fixed w-full h-screen z-10 bottom-0 translate-y-full bg-white px-3 py-10 pt-12'>
-                <ConfirmRidePopUp
-                    ride={ride}
-                    setConfirmRidePopupPanel={setConfirmRidePopupPanel} setRidePopupPanel={setRidePopupPanel} />
-            </div>
+     <BottomSheet
+    open={ridePopupPanel}
+    onClose={() => setRidePopupPanel(false)}
+>
+    <RidePopUp
+        ride={ride}
+        setRidePopupPanel={setRidePopupPanel}
+        setConfirmRidePopupPanel={setConfirmRidePopupPanel}
+        confirmRide={confirmRide}
+    />
+</BottomSheet>
+           <BottomSheet
+    open={confirmRidePopupPanel}
+    onClose={() => setConfirmRidePopupPanel(false)}
+    maxHeight="90vh"
+>
+    <ConfirmRidePopUp
+        ride={ride}
+        setConfirmRidePopupPanel={setConfirmRidePopupPanel}
+        setRidePopupPanel={setRidePopupPanel}
+    />
+</BottomSheet>
         </div>
     )
 }

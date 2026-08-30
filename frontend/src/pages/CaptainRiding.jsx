@@ -4,7 +4,7 @@ import FinishRide from '../components/FinishRide'
 import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
 import LiveTracking from '../components/LiveTracking'
-
+import BottomSheet from '../components/BottomSheet'
 const CaptainRiding = () => {
 
     const [ finishRidePanel, setFinishRidePanel ] = useState(false)
@@ -48,11 +48,16 @@ const CaptainRiding = () => {
                 <h4 className='text-xl font-semibold'>{'4 KM away'}</h4>
                 <button className=' bg-green-600 text-white font-semibold p-3 px-10 rounded-lg'>Complete Ride</button>
             </div>
-            <div ref={finishRidePanelRef} className='fixed w-full z-[500] bottom-0 translate-y-full bg-white px-3 py-10 pt-12'>
-                <FinishRide
-                    ride={rideData}
-                    setFinishRidePanel={setFinishRidePanel} />
-            </div>
+            <BottomSheet
+    open={finishRidePanel}
+    onClose={() => setFinishRidePanel(false)}
+    maxHeight="90vh"
+>
+    <FinishRide
+        ride={rideData}
+        setFinishRidePanel={setFinishRidePanel}
+    />
+</BottomSheet>
 
             <div className='h-screen fixed w-screen top-0 z-[-1]'>
                 <LiveTracking />

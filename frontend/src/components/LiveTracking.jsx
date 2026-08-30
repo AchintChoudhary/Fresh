@@ -1,68 +1,143 @@
-import React, { useState, useEffect } from 'react'
-import { LoadScript, GoogleMap, Marker } from '@react-google-maps/api'
+import React, { useEffect, useState } from 'react'
+import {
+    MapContainer,
+    TileLayer,
+    Marker,
+    Popup,
+    useMap
+} from 'react-leaflet'
 
-const containerStyle = {
-    width: '100%',
-    height: '100%',
-};
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 
-const center = {
-    lat: -3.745,
-    lng: -38.523
-};
+const defaultPosition = [22.7196, 75.8577] // Indore fallback
+
+const userIcon = new L.Icon({
+    iconUrl:
+        'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+    iconRetinaUrl:
+        'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+    shadowUrl:
+        'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+})
+
+
+const RecenterMap = ({ position }) => {
+    const map = useMap()
+
+    useEffect(() => {
+        if (position) {
+            map.setView(position, map.getZoom(), {
+                animate: true
+            })
+        }
+    }, [position, map])
+
+    return null
+}
+
 
 const LiveTracking = () => {
-    const [ currentPosition, setCurrentPosition ] = useState(center);
+    const [currentPosition, setCurrentPosition] =
+        useState(defaultPosition)
+
+    const [locationError, setLocationError] =
+        useState(false)
 
     useEffect(() => {
-        navigator.geolocation.getCurrentPosition((position) => {
-            const { latitude, longitude } = position.coords;
-            setCurrentPosition({
-                lat: latitude,
-                lng: longitude
-            });
-        });
+        if (!navigator.geolocation) {
+            setLocationError(true)
+            return
+        }
 
-        const watchId = navigator.geolocation.watchPosition((position) => {
-            const { latitude, longitude } = position.coords;
-            setCurrentPosition({
-                lat: latitude,
-                lng: longitude
-            });
-        });
+        const watchId =
+            navigator.geolocation.watchPosition(
+                (position) => {
+                    setCurrentPosition([
+                        position.coords.latitude,
+                        position.coords.longitude
+                    ])
 
-        return () => navigator.geolocation.clearWatch(watchId);
-    }, []);
+                    setLocationError(false)
+                },
+                (error) => {
+                    console.error(
+                        'Geolocation error:',
+                        error.message
+                    )
 
-    useEffect(() => {
-        const updatePosition = () => {
-            navigator.geolocation.getCurrentPosition((position) => {
-                const { latitude, longitude } = position.coords;
+                    setLocationError(true)
+                },
+                {
+                    enableHighAccuracy: true,
+                    maximumAge: 5000,
+                    timeout: 10000
+                }
+            )
 
-                console.log('Position updated:', latitude, longitude);
-                setCurrentPosition({
-                    lat: latitude,
-                    lng: longitude
-                });
-            });
-        };
+        return () => {
+            navigator.geolocation.clearWatch(watchId)
+        }
+    }, [])
 
-        updatePosition(); // Initial position update
-
-        const intervalId = setInterval(updatePosition, 1000); // Update every 10 seconds
-
-    }, []);
 
     return (
-        <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
-            <GoogleMap
-                mapContainerStyle={containerStyle}
+        <div className="relative h-full w-full overflow-hidden">
+
+            <MapContainer
                 center={currentPosition}
                 zoom={15}
+                zoomControl={false}
+                className="h-full w-full"
             >
-                <Marker position={currentPosition} />
-            </GoogleMap>
-        </LoadScript>
+
+                <TileLayer
+                    attribution="© MapTiler © OpenStreetMap contributors"
+                    url={`https://api.maptiler.com/maps/streets/{z}/{x}/{y}.png?key=${import.meta.env.VITE_MAPTILER_API_KEY}`}
+                />
+
+                <RecenterMap
+                    position={currentPosition}
+                />
+
+                <Marker
+                    position={currentPosition}
+                    icon={userIcon}
+                >
+                    <Popup>
+                        You are here
+                    </Popup>
+                </Marker>
+
+            </MapContainer>
+
+            {locationError && (
+                <div className="
+                    absolute
+                    top-4
+                    left-1/2
+                    -translate-x-1/2
+                    z-[1000]
+                    bg-white
+                    shadow-lg
+                    rounded-xl
+                    px-4
+                    py-2
+                    text-sm
+                    text-gray-700
+                    max-w-[90%]
+                    text-center
+                ">
+                    Location permission is required for live tracking.
+                </div>
+            )}
+
+        </div>
     )
 }
 
